@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserProfile = async (supabaseUser: SupabaseUser) => {
+  const fetchUserProfile = async (supabaseUser: SupabaseUser, retryCount = 0) => {
     try {
       const { data, error } = await supabase
         .from('users')
@@ -58,10 +58,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', supabaseUser.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // If user profile doesn't exist and this is a new signup, wait and retry
+        if (error.code === 'PGRST116' && retryCount < 3) {
+          console.log('User profile not found, retrying...', retryCount + 1);
+          setTimeout(() => {
+            fetchUserProfile(supabaseUser, retryCount + 1);
+          }, 1000); // Wait 1 second and retry
+          return;
+        }
+        throw error;
+      }
+      
       setUser(data);
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      // If profile still doesn't exist after retries, sign out the user
+      if (retryCount >= 3) {
+        console.error('Failed to create user profile after signup');
+        await supabase.auth.signOut();
+      }
     } finally {
       setLoading(false);
     }

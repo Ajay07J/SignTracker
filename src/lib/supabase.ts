@@ -30,10 +30,8 @@ export const getFileUrl = (bucket: string, path: string) => {
   return data.publicUrl;
 };
 
-// Auth helpers
+// FIXED: Auth helpers with automatic profile creation
 export const signUp = async (email: string, password: string, employeeCode: string, fullName: string) => {
-  const isAdmin = isAdminCode(employeeCode);
-  
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -41,28 +39,15 @@ export const signUp = async (email: string, password: string, employeeCode: stri
       data: {
         employee_code: employeeCode,
         full_name: fullName,
-        is_admin: isAdmin,
       }
     }
   });
 
   if (error) throw error;
 
-  // Insert user profile
-  if (data.user) {
-    const { error: profileError } = await supabase
-      .from('users')
-      .insert({
-        id: data.user.id,
-        email,
-        employee_code: employeeCode,
-        full_name: fullName,
-        is_admin: isAdmin,
-      });
-
-    if (profileError) throw profileError;
-  }
-
+  // Note: User profile will be automatically created by database trigger
+  // No need to manually insert into users table anymore!
+  
   return data;
 };
 
